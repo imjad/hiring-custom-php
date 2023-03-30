@@ -46,6 +46,7 @@ final class Handler extends FaultyHandler
         } elseif ($e instanceof StdHttpException) {
             $data = $this->generateData($e);
         } else {
+            $this->errorCounter();
             return parent::handle($request, $e);
         }
 
@@ -53,7 +54,33 @@ final class Handler extends FaultyHandler
             $data['trace'] = $e->getTraceAsString();
         }
 
+        $this->errorCounter();
+
         return response()->json($data, $data['status'], ['Content-Type' => 'application/problem+json']);
+    }
+
+    // add a counter into the metrics
+    protected function errorCounter()
+    {
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $res = $client->request('GET', 'http://metrics-gateway:9091/api/v1/metrics');
+            $contents = (string) $res->getBody();
+            $obj = json_decode($contents);
+            if ($obj && $obj->data && $obj->data[0]) {
+                $value = $obj->data[0]->labels->instance;
+                $valueNum = intval($value) + 1;
+                $client->request('DELETE', 'http://metrics-gateway:9091/metrics/job/aepg_epg_api_error_counter/instance/' . $value);
+                $client->request('POST', 'http://metrics-gateway:9091/metrics/job/aepg_epg_api_error_counter/instance/' . $valueNum);
+            } else {
+                $client->request('POST', 'http://metrics-gateway:9091/metrics/job/aepg_epg_api_error_counter/instance/1');
+            }
+        } finally {
+           return true;
+        }
+      
+        return true;
     }
 
     protected function generateData(StdHttpException $e)
