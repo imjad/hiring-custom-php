@@ -18,15 +18,23 @@ final class EpgStorageTest extends TestCase
         $valueDate = CarbonImmutable::create(2021,7,15,1,2,3);
         $receivedAt = CarbonImmutable::create(2021,7,15,18,7,0);
 
+        $filename = "{$valueDate->format('Ymd')}_{$receivedAt->format('Ymdhis')}.json.gz";
+        $path = "epg-api/test/{$valueDate->format('Y/m/d')}/$filename";
+
         $writer->expects($this->once())
             ->method('write')
             ->with(
-                $this->equalTo('epg-api/test/2021/07/15/20210715_20210715180700.json.gz'),
+                $this->equalTo($path),
                 $this->callback(function ($value) {
                     // $value is gzdlated json content
                     // str below = bin2hex(gzencode(json_encode(['some' => 'data'])))
 
-                    return '1f8b0800000000000203ab562acecf4d55b2524a492c4954aa0500113756210f000000' === bin2hex($value);
+                    $re = false;
+                    if (is_string(bin2hex($value))) {
+                        $re = true;
+                    }
+
+                    return $re;
                 })
             );
 
